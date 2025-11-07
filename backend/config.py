@@ -64,7 +64,7 @@ DEBUG = False  # IMPORTANT: Must be False to prevent auto-reloader from creating
 # CORS Settings
 # Add your frontend URLs here when deploying to separate platforms
 CORS_ALLOWED_ORIGINS = [
-    "http://axon-c2-poc.vercel.app",
+    "https://axon-c2-poc.vercel.app",
     "http://35.151.134.67:3000",              # Local development (alt)
     # Production examples - uncomment and update with your actual domains:
     # "https://your-app.vercel.app",      # Vercel
