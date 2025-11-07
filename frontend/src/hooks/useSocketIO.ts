@@ -49,7 +49,7 @@ interface UseSocketIOReturn {
   reconnect: () => void;
 }
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = process.env.REACT_APP_BACKEND_URL;
 
 export const useSocketIO = (): UseSocketIOReturn => {
   const [socket, setSocket] = useState<Socket | null>(null);
