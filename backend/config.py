@@ -14,7 +14,7 @@
 #   - Good for: secure remote access
 #
 # MODE 3: Direct Remote Connection (requires firewall rules)
-#   - Use "129.153.124.182" for host
+#   - Use "129.XXX.124.XXX" for host
 #   - Requires: sudo ufw allow 14580-14582/udp on remote server
 #   - Warning: Exposes PX4 to internet - not recommended for production
 #
@@ -64,8 +64,8 @@ DEBUG = False  # IMPORTANT: Must be False to prevent auto-reloader from creating
 # CORS Settings
 # Add your frontend URLs here when deploying to separate platforms
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",              # Local development
-    "http://127.0.0.1:3000",              # Local development (alt)
+    "http://axon-c2-poc.vercel.app",
+    "http://35.151.134.67:3000",              # Local development (alt)
     # Production examples - uncomment and update with your actual domains:
     # "https://your-app.vercel.app",      # Vercel
     # "https://your-app.netlify.app",     # Netlify
