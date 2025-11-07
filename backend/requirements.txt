@@ -1,0 +1,7 @@
+flask==3.0.0
+flask-socketio==5.3.5
+flask-cors==4.0.0
+pymavlink==2.4.41
+python-socketio==5.10.0
+websocket-client==1.6.4
+eventlet==0.33.3
