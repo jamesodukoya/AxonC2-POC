@@ -44,6 +44,7 @@ RUN mkdir -p /home/$USERNAME/app && \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     procps \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -60,10 +61,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . /home/$USERNAME
 
+# Copy supervisor configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy startup delay script
+COPY start_commander.sh /home/$USERNAME/start_commander.sh
+RUN chmod +x /home/$USERNAME/start_commander.sh && \
+    chown $USERNAME:$USERNAME /home/$USERNAME/start_commander.sh
+
 
 
 # Expose port (documentation only, actual binding happens at runtime)
 EXPOSE 5000
 
 # Default command
-CMD ["/bin/bash"]
+# Start supervisord
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

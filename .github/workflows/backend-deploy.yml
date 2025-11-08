@@ -95,55 +95,6 @@ jobs:
 
         echo "✓ Container deployment complete"
         DEPLOY_EOF
-
-    
-    - name: Stop any existing Flask server processes
-      env:
-        ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
-        ORACLE_USER: ${{ secrets.ORACLE_VM_USER }}
-      run: |
-        ssh $ORACLE_USER@$ORACLE_HOST << 'STOP_EOF'
-        echo "Stopping any existing Flask server processes..."
-        docker exec axonpoc-backend pkill -f app 2>/dev/null || true
-        docker exec axonpoc-backend pkill -f commander 2>/dev/null || true
-        sleep 3
-        STOP_EOF
-      
-    - name: Launch perpetual Flask server
-      env:
-        ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
-        ORACLE_USER: ${{ secrets.ORACLE_VM_USER }}
-      run: |
-        ssh $ORACLE_USER@$ORACLE_HOST << 'SPAWN_EOF'
-        set -e
-        
-        echo "Starting perpetual server..."
-        
-        docker exec -d axonpoc-backend bash -c "
-            while true; do
-              if ! pgrep -f 'python3 app.py' > /dev/null 2>&1; then
-                echo '[backend_monitor] Backend process not found, starting server...'
-                cd ~/app
-                if pgrep -f 'python commander.py' > /dev/null 2>&1; then
-                    pkill -f commander
-                fi
-                python3 app.py
-                sleep 30
-              else
-                echo '[backend_monitor] Backend process is running'
-              fi
-              sleep 5
-            done
-        " > /tmp/backend_monitor.log 2>&1 &
-        
-        SPAWN_PID=$!
-        echo "✓ Server spawner started (PID: $SPAWN_PID)"
-        echo "  Log: docker exec axonpoc-backend tail -f /tmp/flask_server.log"
-        
-        SPAWN_EOF
-    
-    - name: Wait for server to stabilize
-      run: sleep 25
   
     
     - name: Verify deployment
