@@ -73,4 +73,4 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Allow all origins in development (NOT for production!)
-CORS_ALLOW_ALL = False  # Set to True only for development testing
+CORS_ALLOW_ALL = True  # Set to True only for development testing
