@@ -20,10 +20,12 @@ WORKDIR /app
 # Install system dependencies
 # - gcc: Required for building Python packages with C extensions
 # - supervisor: Process control system for auto-restart
+# - procps: Provides ps, pgrep, pkill commands
 # - Clean up apt cache to reduce image size
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     supervisor \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for better layer caching)

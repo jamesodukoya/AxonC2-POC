@@ -46,8 +46,7 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # Exit-zero treats all errors as warnings
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
-    
+
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
@@ -82,87 +81,132 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Deploy to Oracle VM via SSH
-      uses: appleboy/ssh-action@v1.0.3
+    - name: Setup SSH agent
+      uses: webfactory/ssh-agent@v0.9.0
       with:
-        host: ${{ secrets.ORACLE_VM_HOST }}
-        username: ${{ secrets.ORACLE_VM_USER }}
-        key: ${{ secrets.ORACLE_VM_SSH_KEY }}
-        port: 22
-        script: |
-          set -e
-          
-          echo "=== Starting deployment ==="
-          
-          # Navigate to project directory
-          cd ~/AxonPOC || { echo "Project directory not found!"; exit 1; }
-          
-          # Pull latest code
-          echo "Pulling latest code from GitHub..."
-          git fetch origin
-          git reset --hard origin/main
-          
-          # Navigate to backend directory
-          cd backend
-          
-          # Build new Docker image
-          echo "Building Docker image..."
-          docker build -t ${{ env.DOCKER_IMAGE }}:latest .
-          
-          # Stop existing container gracefully
-          echo "Stopping existing container..."
-          docker stop ${{ env.CONTAINER_NAME }} || true
-          docker rm ${{ env.CONTAINER_NAME }} || true
-          
-          # Start new container with supervisord
-          echo "Starting new container with supervisord..."
-          docker run -d \
-            --name ${{ env.CONTAINER_NAME }} \
-            --network host \
-            --restart unless-stopped \
-            -v $(pwd)/logs:/app/logs \
-            -e PYTHONUNBUFFERED=1 \
-            ${{ env.DOCKER_IMAGE }}:latest
-          
-          # Wait for services to start
-          echo "Waiting for services to initialize (30 seconds)..."
-          sleep 30
-          
-          # Verify container is running
-          if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
-            echo "✅ Container is running"
-            docker ps | grep ${{ env.CONTAINER_NAME }}
-          else
-            echo "❌ Container failed to start"
-            docker logs ${{ env.CONTAINER_NAME }}
-            exit 1
-          fi
-          
-          # Health check
-          echo "Running health check..."
-          curl -f http://localhost:5000/ || { echo "❌ Health check failed!"; exit 1; }
-          echo "✅ Backend API is healthy"
-          
-          # Verify supervisord is managing processes
-          echo "Checking supervisord status..."
-          docker exec ${{ env.CONTAINER_NAME }} supervisorctl status || echo "⚠️ Warning: Could not get supervisor status"
-          
-          # Verify both processes are running
-          echo "Verifying processes..."
-          docker exec ${{ env.CONTAINER_NAME }} pgrep -f "python3 app.py" || echo "⚠️ Warning: app.py process not found"
-          docker exec ${{ env.CONTAINER_NAME }} pgrep -f "python3 commander.py" || echo "⚠️ Warning: commander.py process not found"
-          
-          echo "✅ Deployment completed - Supervisord is managing processes with auto-restart"
-          
-          echo "=== Deployment completed successfully ==="
-          
-          # Clean up old images
-          echo "Cleaning up old Docker images..."
-          docker image prune -af --filter "until=24h" || true
-          
-          echo "=== Final status ==="
-          docker ps | grep ${{ env.CONTAINER_NAME }}
-          docker logs --tail=20 ${{ env.CONTAINER_NAME }}
+        ssh-private-key: ${{ secrets.ORACLE_VM_SSH_KEY }}
+    
+    - name: Add Oracle host to known_hosts
+      env:
+        ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
+      run: ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+    
+    - name: Deploy to Oracle VM
+      env:
+        ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
+        ORACLE_USER: ${{ secrets.ORACLE_VM_USER }}
+      run: |
+        ssh $ORACLE_USER@$ORACLE_HOST << 'DEPLOY_EOF'
+        set -e
+        
+        echo "=== Starting deployment ==="
+        
+        # Navigate to project directory
+        cd ~/AxonPOC || { echo "Project directory not found!"; exit 1; }
+        
+        # Pull latest code
+        echo "Pulling latest code from GitHub..."
+        git fetch origin
+        git reset --hard origin/main
+        
+        # Navigate to backend directory
+        cd backend
+        
+        # Build new Docker image
+        echo "Building Docker image..."
+        docker build -t ${{ env.DOCKER_IMAGE }}:latest .
+        
+        # Stop existing container
+        echo "Stopping existing container..."
+        docker stop ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+        docker rm ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+        
+        # Start new container with supervisord
+        echo "Starting new container with supervisord..."
+        docker run -d \
+          --name ${{ env.CONTAINER_NAME }} \
+          --network host \
+          --restart unless-stopped \
+          -v $(pwd)/logs:/app/logs \
+          -e PYTHONUNBUFFERED=1 \
+          ${{ env.DOCKER_IMAGE }}:latest
+        
+        # Wait for services to start
+        echo "Waiting for services to initialize (30 seconds)..."
+        sleep 30
+        
+        echo "=== Deployment completed successfully ==="
+        DEPLOY_EOF
+    
+    - name: Verify deployment
+      env:
+        ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
+        ORACLE_USER: ${{ secrets.ORACLE_VM_USER }}
+      run: |
+        ssh $ORACLE_USER@$ORACLE_HOST << 'VERIFY_EOF'
+        
+        echo ""
+        echo "=================================="
+        echo "  DEPLOYMENT VERIFICATION"
+        echo "=================================="
+        
+        echo ""
+        echo "=== Docker Container Status ==="
+        docker ps | grep ${{ env.CONTAINER_NAME }}
+        
+        if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+          echo "✅ Container is running"
+        else
+          echo "❌ Container failed to start"
+          docker logs ${{ env.CONTAINER_NAME }}
+          exit 1
+        fi
+        
+        echo ""
+        echo "=== Health Check ==="
+        curl -f http://localhost:5000/ || { echo "❌ Health check failed!"; exit 1; }
+        echo "✅ Backend API is healthy"
+        
+        echo ""
+        echo "=== Supervisord Status ==="
+        docker exec ${{ env.CONTAINER_NAME }} supervisorctl status || echo "⚠️ Supervisorctl not available"
+        
+        echo ""
+        echo "=== Process Status ==="
+        BACKEND_COUNT=$(docker exec ${{ env.CONTAINER_NAME }} bash -c "ps aux | grep 'python3 app.py' | grep -v grep | wc -l" || echo "0")
+        COMMANDER_COUNT=$(docker exec ${{ env.CONTAINER_NAME }} bash -c "ps aux | grep 'python3 commander.py' | grep -v grep | wc -l" || echo "0")
+        echo "Backend processes: $BACKEND_COUNT"
+        echo "Commander processes: $COMMANDER_COUNT"
+        
+        if [ "$BACKEND_COUNT" -gt 0 ]; then
+          echo "✅ Backend (app.py) is running"
+        else
+          echo "⚠️ Backend (app.py) not detected"
+        fi
+        
+        if [ "$COMMANDER_COUNT" -gt 0 ]; then
+          echo "✅ Commander is running"
+        else
+          echo "⚠️ Commander not detected"
+        fi
+        
+        echo ""
+        echo "=== Recent Logs (last 10 lines) ==="
+        docker logs --tail 10 ${{ env.CONTAINER_NAME }}
+        
+        echo ""
+        echo "=================================="
+        echo "  ✅ DEPLOYMENT COMPLETE"
+        echo "=================================="
+        echo ""
+        echo "Monitor logs:"
+        echo "  docker logs -f ${{ env.CONTAINER_NAME }}"
+        echo ""
+        echo "Check supervisord status:"
+        echo "  docker exec ${{ env.CONTAINER_NAME }} supervisorctl status"
+        echo ""
+        
+        VERIFY_EOF
     
     - name: Deployment Status Notification
       if: always()
