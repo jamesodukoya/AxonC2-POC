@@ -47,10 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-# Switch to user
-USER $USERNAME
-WORKDIR /home/$USERNAME
 
 # Copy requirements first (for better layer caching)
 COPY requirements.txt /home/$USERNAME
@@ -69,6 +65,10 @@ COPY start_commander.sh /home/$USERNAME/start_commander.sh
 RUN chmod +x /home/$USERNAME/start_commander.sh && \
     chown $USERNAME:$USERNAME /home/$USERNAME/start_commander.sh
 
+# Set working directory
+# Switch to user
+USER $USERNAME
+WORKDIR /home/$USERNAME
 
 
 # Expose port (documentation only, actual binding happens at runtime)
