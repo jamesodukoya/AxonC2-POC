@@ -65,6 +65,10 @@ DEBUG = False  # IMPORTANT: Must be False to prevent auto-reloader from creating
 # Add your frontend URLs here when deploying to separate platforms
 CORS_ALLOWED_ORIGINS = [
     "https://axon-c2-poc.vercel.app",
+    "https://*.vercel.app",                   # All Vercel preview deployments
+    "http://localhost:3000",                  # Local development
+    "http://localhost:5173",
+    "http://35.151.134.67:3000",
     "http://35.151.134.67:3000",              # Local development (alt)
     # Production examples - uncomment and update with your actual domains:
     # "https://your-app.vercel.app",      # Vercel
@@ -73,4 +77,4 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Allow all origins in development (NOT for production!)
-CORS_ALLOW_ALL = True  # Set to True only for development testing
+CORS_ALLOW_ALL = False  # Set to True only for development testing
