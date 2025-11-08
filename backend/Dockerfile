@@ -8,6 +8,11 @@ LABEL maintainer="odukoyajames@gmail.com"
 LABEL description="PX4 Command & Control Dashboard Backend with Supervisord"
 LABEL version="2.0"
 
+# Install sudo first
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
 # Arguments for user creation
 ARG USERNAME=user
 ARG USER_UID=1000
