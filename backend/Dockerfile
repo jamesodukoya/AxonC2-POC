@@ -31,8 +31,9 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
-# Create workspace directory
+# Create workspace directory with logs
 RUN mkdir -p /home/$USERNAME/app && \
+    mkdir -p /home/$USERNAME/logs && \
     chown -R $USERNAME:$USERNAME /home/$USERNAME
 
 
@@ -61,8 +62,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . /home/$USERNAME
 
+# Switch to root to copy supervisor config
+USER root
+
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Switch back to user
+USER $USERNAME
 
 # Copy startup delay script
 COPY --chown=$USERNAME:$USERNAME start_commander.sh /home/$USERNAME/start_commander.sh
@@ -74,5 +81,6 @@ RUN chmod +x /home/$USERNAME/start_commander.sh
 EXPOSE 5000
 
 # Default command
-# Start supervisord
+# Start supervisord as root to manage user processes
+USER root
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

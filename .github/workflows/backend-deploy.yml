@@ -49,8 +49,11 @@ jobs:
         ORACLE_HOST: ${{ secrets.ORACLE_VM_HOST }}
         ORACLE_USER: ${{ secrets.ORACLE_VM_USER }}
       run: |
-        rsync -avz \
+        rsync -avz --delete \
           -e "ssh" \
+          --exclude='.git' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
           backend/ \
           $ORACLE_USER@$ORACLE_HOST:~/AxonPOC/
 
@@ -69,9 +72,6 @@ jobs:
           exit 1
         fi
         
-        # Fix workspace ownership for container user (UID 1000)
-        sudo chown -R 1000:1000 ~/AxonPOC/app
-        
         echo "Building Docker..."
         docker build \
           -f Dockerfile \
@@ -84,16 +84,20 @@ jobs:
         docker stop axonpoc-backend 2>/dev/null || true
         docker rm axonpoc-backend 2>/dev/null || true
         
-        echo "Launching container with persistent workspace volume..."
+        echo "Launching container..."
         docker run -d \
           --name axonpoc-backend \
-          -v ~/AxonPOC/app:/home/user/app \
+          -p 5000:5000 \
           --privileged \
           --network=host \
-          axonpoc-backend:latest \
-          sleep infinity
+          axonpoc-backend:latest
 
         echo "✓ Container deployment complete"
+        
+        # Wait for services to start
+        echo "Waiting 15 seconds for services to start..."
+        sleep 15
+        
         DEPLOY_EOF
   
     
@@ -111,44 +115,47 @@ jobs:
         
         echo ""
         echo "=== Docker Container Status ==="
-        docker ps | grep ${{ env.CONTAINER_NAME }}
+        docker ps | grep ${{ env.CONTAINER_NAME }} || echo "Container not found in ps output"
         
         if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
           echo "✅ Container is running"
         else
           echo "❌ Container failed to start"
+          echo ""
+          echo "=== Container Logs ==="
+          docker logs ${{ env.CONTAINER_NAME }} || echo "Failed to get logs"
+          exit 1
+        fi
+        
+        echo ""
+        echo "=== Supervisord Status ==="
+        docker exec ${{ env.CONTAINER_NAME }} supervisorctl status || echo "Failed to get supervisorctl status"
+        
+        echo ""
+        echo "=== Process Status ==="
+        docker exec ${{ env.CONTAINER_NAME }} ps aux | grep -E "python3|supervisord" | grep -v grep || echo "No Python processes found"
+        
+        echo ""
+        echo "=== Checking Flask Logs ==="
+        docker exec ${{ env.CONTAINER_NAME }} cat /home/user/logs/flask.log 2>/dev/null || echo "Flask log not available yet"
+        docker exec ${{ env.CONTAINER_NAME }} cat /home/user/logs/flask_error.log 2>/dev/null || echo "No Flask errors"
+        
+        echo ""
+        echo "=== Health Check ==="
+        sleep 5  # Give Flask extra time to start
+        if curl -f http://localhost:5000/ 2>/dev/null; then
+          echo "✅ Backend API is healthy"
+        else
+          echo "❌ Health check failed - dumping all logs:"
+          echo ""
+          echo "=== Full Container Logs ==="
           docker logs ${{ env.CONTAINER_NAME }}
           exit 1
         fi
         
         echo ""
-        echo "=== Health Check ==="
-        curl -f http://localhost:5000/ || { echo "❌ Health check failed!"; exit 1; }
-        echo "✅ Backend API is healthy"
-        
-        
-        echo ""
-        echo "=== Process Status ==="
-        BACKEND_COUNT=$(docker exec ${{ env.CONTAINER_NAME }} bash -c "ps aux | grep 'python3 app.py' | grep -v grep | wc -l" || echo "0")
-        COMMANDER_COUNT=$(docker exec ${{ env.CONTAINER_NAME }} bash -c "ps aux | grep 'python3 commander.py' | grep -v grep | wc -l" || echo "0")
-        echo "Backend processes: $BACKEND_COUNT"
-        echo "Commander processes: $COMMANDER_COUNT"
-        
-        if [ "$BACKEND_COUNT" -gt 0 ]; then
-          echo "✅ Backend (app.py) is running"
-        else
-          echo "⚠️ Backend (app.py) not detected"
-        fi
-        
-        if [ "$COMMANDER_COUNT" -gt 0 ]; then
-          echo "✅ Commander is running"
-        else
-          echo "⚠️ Commander not detected"
-        fi
-        
-        echo ""
-        echo "=== Recent Logs (last 10 lines) ==="
-        docker logs --tail 10 ${{ env.CONTAINER_NAME }}
+        echo "=== Recent Container Logs ==="
+        docker logs --tail 20 ${{ env.CONTAINER_NAME }}
         
         echo ""
         echo "=================================="
@@ -160,6 +167,9 @@ jobs:
         echo ""
         echo "Check supervisord status:"
         echo "  docker exec ${{ env.CONTAINER_NAME }} supervisorctl status"
+        echo ""
+        echo "View Flask logs:"
+        echo "  docker exec ${{ env.CONTAINER_NAME }} cat /home/user/logs/flask.log"
         echo ""
         
         VERIFY_EOF
