@@ -46,6 +46,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
+# Switch to user
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
 # Copy requirements first (for better layer caching)
 COPY requirements.txt /home/$USERNAME
 
@@ -55,10 +60,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . /home/$USERNAME
 
-# Set working directory
-# Switch to user
-USER $USERNAME
-WORKDIR /home/$USERNAME
+
 
 # Expose port (documentation only, actual binding happens at runtime)
 EXPOSE 5000
