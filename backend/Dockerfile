@@ -49,30 +49,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
-# Switch to user
-USER $USERNAME
 WORKDIR /home/$USERNAME
 
 # Copy requirements first (for better layer caching)
-COPY requirements.txt /home/$USERNAME
+COPY requirements.txt /home/$USERNAME/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies as root to avoid permission issues
+RUN pip install --no-cache-dir -r /home/$USERNAME/requirements.txt
 
-# Copy application code
-COPY . /home/$USERNAME
-
-# Switch to root to copy supervisor config
-USER root
-
-# Copy supervisor configuration
+# Copy supervisor configuration (needs root)
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Switch back to user
+# Switch to user and copy application code
 USER $USERNAME
 
-# Copy startup delay script
-COPY --chown=$USERNAME:$USERNAME start_commander.sh /home/$USERNAME/start_commander.sh
+# Copy application code and scripts
+COPY --chown=$USERNAME:$USERNAME . /home/$USERNAME/
+
+# Make startup script executable
 RUN chmod +x /home/$USERNAME/start_commander.sh
 
 
