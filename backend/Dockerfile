@@ -1,12 +1,12 @@
-# AxonPOC Backend Dockerfile - Production Ready
+# AxonPOC Backend Dockerfile - Production Ready with Supervisord
 # Python 3.11 slim base image for smaller size
 
 FROM python:3.11-slim
 
 # Metadata
-LABEL maintainer="odukoyajames@gmail.com"
-LABEL description="PX4 Command & Control Dashboard Backend"
-LABEL version="1.0"
+LABEL maintainer="jay@axonpoc.com"
+LABEL description="PX4 Command & Control Dashboard Backend with Supervisord"
+LABEL version="2.0"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -19,9 +19,11 @@ WORKDIR /app
 
 # Install system dependencies
 # - gcc: Required for building Python packages with C extensions
+# - supervisor: Process control system for auto-restart
 # - Clean up apt cache to reduce image size
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (for better layer caching)
@@ -41,15 +43,19 @@ RUN useradd -m -u 1000 appuser && \
 RUN mkdir -p /app/logs && \
     chown -R appuser:appuser /app/logs
 
-# Switch to non-root user
-USER appuser
+# Create supervisor log directory
+RUN mkdir -p /var/log/supervisor && \
+    chown -R appuser:appuser /var/log/supervisor
+
+# Copy supervisord configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose port (documentation only, actual binding happens at runtime)
 EXPOSE 5000
 
-# Health check
+# Health check - checks if backend API is responding
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/').read()"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/').read()" || exit 1
 
-# Run the application
-CMD ["python3", "app.py"]
+# Run supervisord (manages both app.py and commander.py)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
