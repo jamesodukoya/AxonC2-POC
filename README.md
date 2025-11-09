@@ -11,6 +11,9 @@ A production-grade, real-time command and control platform for autonomous drone 
 
 ---
 
+## [Live website](https://axon-c2-poc.vercel.app/)
+## [Demo video](https://youtu.be/xUNpxMBmeog)
+
 ## 🚀 Project Highlights
 
 ### Performance Metrics
