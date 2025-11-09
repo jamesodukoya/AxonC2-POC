@@ -85,6 +85,7 @@ const Dashboard: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold">PX4 Command & Control</h1>
             <p className="text-sm text-gray-400">Real-time Multi-Drone Dashboard</p>
+            <p><a href='https://youtu.be/xUNpxMBmeog' target='_blank' className='underline text-orange-500'>Explainer video</a></p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
